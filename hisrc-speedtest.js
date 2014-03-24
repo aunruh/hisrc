@@ -219,15 +219,19 @@
 			$els.on('speedTestComplete.hisrc', function(){
 
 				if (speedConnectionStatus === STATUS_COMPLETE) {
-
-					settings.success.call(this);
+					
+					if (typeof settings.success === 'function') {
+						settings.success.call(this);
+					}
 
 				// turn off so hisrc() can be called many times on same element.
 				$els.off('speedTestComplete.hisrc');
 
 			}
 			else{
-				settings.error.call(this);
+				if (typeof settings.error === 'function') {
+					settings.error.call(this);
+				}
 			}
 		});
 
