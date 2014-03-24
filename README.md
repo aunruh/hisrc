@@ -1,8 +1,9 @@
 HiSRC – speedtest only
 
 Modified version that only contains the speedtest & pixelratio-test. Also added success and error callback functions.
-Usage:
+Usage (outside of document ready):
 
+```
   jQuery.hisrc.speedTest({
     speedTestUri: '/path/to/50K.jpg',
     success: function(){
@@ -14,3 +15,4 @@ Usage:
       console.log('error');
     }
   });
+```  
