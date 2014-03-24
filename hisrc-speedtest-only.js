@@ -4,7 +4,20 @@
  * Copyright (c) 2012
  * Licensed under the MIT license.
  *
- */
+ * modified version that only contains the speedtest & pixelratio-test. also added success and error callback functions.
+ * usage:
+	jQuery.hisrc.speedTest({
+		speedTestUri: '/path/to/50K.jpg',
+		success: function(){
+			console.log('success');
+			console.log(jQuery.hisrc.bandwidth);
+			console.log(jQuery.hisrc.devicePixelRatio);
+		},
+		error: function(){
+			console.log('error');
+		}
+	});
+*/
 
 (function($){
 	$.hisrc = {
@@ -16,14 +29,11 @@
 	};
 
 	$.hisrc.defaults = {
-		useTransparentGif: false,
-		transparentGifSrc: 'data:image/gif;base64,R0lGODlhAQABAIAAAMz/AAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==',
 		minKbpsForHighBandwidth: 300,
 		speedTestUri: '50K.jpg',
 		speedTestKB: 50,
 		speedTestExpireMinutes: 30,
 		forcedBandwidth: false,
-		srcIsLowResolution: true
 	};
 
 	// for performance, run this right away (requires jQuery, but no need to wait for DOM to be ready)
@@ -34,17 +44,18 @@
 
 	$.fn.hisrc = function(options) {
 		var settings = $.extend({
-			callback: function() {}
+			success: function() {},
+			error: function() {},
 		}, $.hisrc.defaults, options),
 
-			$els = $(this),
+		$els = $(this),
 
 			// check bandwidth via @Modernizr's network-connection.js
 			connection = navigator.connection || { type: 0 }, // polyfill
 
 			isSlowConnection = connection.type == 3
-								|| connection.type == 4
-								|| /^[23]g$/.test(connection.type);
+			|| connection.type == 4
+			|| /^[23]g$/.test(connection.type);
 
 
 		// get pixel ratio
@@ -66,8 +77,8 @@
 		// https://github.com/adamdbradley/foresight.js
 		// Modified by Christopher Deutsch for hisrc.js
 		var speedTestUri = settings.speedTestUri,
-			STATUS_LOADING = 'loading',
-			STATUS_COMPLETE = 'complete',
+		STATUS_LOADING = 'loading',
+		STATUS_COMPLETE = 'complete',
 			LOCAL_STORAGE_KEY = 'fsjs', // may as well piggy-back on Forsight localstorage key since we're doing the same thing.
 			speedConnectionStatus,
 
@@ -172,7 +183,7 @@
 
 				// calculate the maximum number of milliseconds it 'should' take to download an XX Kbps file
 				// set a timeout so that if the speed test download takes too long
-				// than it isn't a 'high-bandwidth' and ignore what the test image .onload has to say
+				// then it isn't a 'high-bandwidth' and ignore what the test image .onload has to say
 				// this is used so we don't wait too long on a speed test response
 				// Adding 350ms to account for TCP slow start, quickAndDirty === TRUE
 				speedTestTimeoutMS = ( ( ( settings.speedTestKB * 8 ) / settings.minKbpsForHighBandwidth ) * 1000 ) + 350;
@@ -201,81 +212,27 @@
 					localStorage.setItem( LOCAL_STORAGE_KEY, JSON.stringify( fsDataToSet ) );
 				} catch( e ) { }
 
-				// trigger swap once speedtest is complete.
 				$els.trigger('speedTestComplete.hisrc');
-			},
-
-			setImageSource = function ( $el, src ) {
-				if ( settings.useTransparentGif ) {
-					$el.attr('src', settings.transparentGifSrc)
-						.css('max-height', '100%')
-						.css('max-width', '100%')
-						.css('background', 'url("' + src + '") no-repeat 0 0')
-						.css('background-size', 'contain');
-				} else {
-					$el.attr( 'src', src );
-				}
 			};
 
-		settings.callback.call(this);
 
-		$els.each(function(){
-			var $el = $(this);
+			$els.on('speedTestComplete.hisrc', function(){
 
-			var src = $el.attr('src');
+				if (speedConnectionStatus === STATUS_COMPLETE) {
 
-			if (src) {
-				if (!$el.data('m1src')) {
-					$el.data('m1src', src);
-				}
+					settings.success.call(this);
 
-				// check for zero which often happens in safari.
-				if (!$el.attr('width') &&  $el.width() > 0) {
-					$el.attr('width', $el.width());
-				}
-				if (!$el.attr('height') &&  $el.height() > 0) {
-					$el.attr('height', $el.height());
-				}
+				// turn off so hisrc() can be called many times on same element.
+				$els.off('speedTestComplete.hisrc');
 
-				$el.on('speedTestComplete.hisrc', function(){
-
-					if (speedConnectionStatus === STATUS_COMPLETE) {
-
-						if (isSlowConnection) {
-							$el.attr( 'src', $el.data('m1src') );
-						} else {
-
-							// check if client can get high res image
-							if ($.hisrc.devicePixelRatio > 1 && $.hisrc.bandwidth === 'high') {
-								var image2x = $el.data('2x');
-								if (!image2x) {
-									// use naming convention.
-									image2x = $el.data('m1src').replace(/\.\w+$/, function(match) { return "@2x" + match; });
-								}
-								setImageSource( $el, image2x );
-							} else {
-								// don't load 1x unless src is a low res version.
-								if (settings.srcIsLowResolution) {
-									var image1x = $el.data('1x');
-									if (!image1x) {
-										// use naming convention.
-										image1x = $el.data('m1src').replace(/\.\w+$/, function(match) { return "@1x" + match; });
-									}
-									setImageSource( $el, image1x );
-								}
-							}
-						}
-						// turn off so hisrc() can be called many times on same element.
-						$el.off('speedTestComplete.hisrc');
-					}
-				});
+			}
+			else{
+				settings.error.call(this);
 			}
 		});
 
-		initSpeedTest();
+			initSpeedTest();
 
-		return $els;
 	};
 
 })(jQuery);
-
